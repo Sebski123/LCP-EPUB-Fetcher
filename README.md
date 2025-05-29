@@ -39,3 +39,7 @@ A new file with `_fetched.epub` appended to the name will be created, containing
 
 ## License
 This project is for educational and personal use only.
+
+## Credits
+
+Thanks to [Terence Eden](https://shkspr.mobi/) for the [inspiration](https://shkspr.mobi/blog/2025/03/towards-extracting-content-from-an-lcp-protected-epub/) 
