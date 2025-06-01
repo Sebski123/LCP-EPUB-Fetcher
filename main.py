@@ -3,9 +3,11 @@ import os
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 
 import requests
+from bs4 import BeautifulSoup
 
 from utils.fettch import get_content_via_evaluate, get_image_via_evaluate
 from utils.get_path import get_base_path
@@ -14,12 +16,16 @@ from utils.get_path import get_base_path
 async def main(epub_path):
     # 1. Launch Thorium Reader with debug args
     thorium_path = R"C:\Users\sebth\AppData\Local\Programs\Thorium\Thorium.exe"  # Adjust if needed
-    proc = subprocess.Popen([
-        thorium_path,
-        epub_path,
-        "--remote-debugging-port=9223",
-        "--remote-allow-origins=*",
-    ])
+    proc = subprocess.Popen(
+        [
+            thorium_path,
+            epub_path,
+            "--remote-debugging-port=9223",
+            "--remote-allow-origins=*",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
     try:
         # 2. Wait for debugger to be ready
@@ -68,25 +74,62 @@ async def main(epub_path):
             manifest = tree.find('.//opf:manifest', ns)
             file_list = [(item.attrib['media-type'], item.attrib['href']) for item in manifest.findall('opf:item', ns)]
 
-        # 5. Fetch each file using get_content_via_evaluate
+        # 5. Fetch each file using get_content_via_evaluate, with progress
         recource_url = await get_base_path(ws_url)
         base_dir = recource_url + os.path.dirname(opf_path)
         fetched_files = {}
-        for file_type, file in file_list:
+        total_files = len(file_list)
+        for idx, (file_type, file) in enumerate(file_list, 1):
+            print(f"Fetching file {idx}/{total_files}: {file} ...", end="\r")
             if file == "nav.xhtml":
                 continue
             if file_type.startswith("application/xhtml+xml") or file_type.startswith("text/css"):
                 file_path = os.path.normpath(os.path.join(base_dir, file))
-                url = file_path  # "file:///" + os.path.abspath(file_path).replace("\\", "/")
+                url = file_path
                 content = await get_content_via_evaluate(ws_url, url)
                 fetched_files[file_path.split("\\")[-1]] = content
             elif file_type.startswith("image/"):
                 file_path = os.path.normpath(os.path.join(base_dir, file))
-                url = file_path  # "file:///" + os.path.abspath(file_path).replace("\\", "/")
+                url = file_path
                 content = await get_image_via_evaluate(ws_url, url)
                 fetched_files[file_path.split("\\")[-1]] = content
+        print(f"\nFetched {len(fetched_files)} files.")
 
-        # 6. Repackage into new epub
+        # 6. Filter the fetched files
+        # the fetched xhtml files contains a bunch of javascript/css that is not needed
+        # in the HEAD section we only need the title and the link to the css file, and meta tags
+        print("Filtering fetched files...")
+        for filename, content in fetched_files.items():
+            if filename.endswith(".xhtml"):
+                # Filter the content to keep only the title, link to css, and meta tags
+                soup = BeautifulSoup(content, 'html.parser')
+                head = soup.head
+                if head:
+                    # Keep only title and link tags
+                    title = head.find('title')
+                    links = head.find_all('link', rel='stylesheet')
+                    metas = head.find_all('meta')
+                    new_head = soup.new_tag('head')
+                    if title:
+                        new_head.append(title)
+                    for link in links:
+                        # Skip Thorium/Readium specific styles
+                        if "thorium" in link.get('href', '') or "readium" in link.get('href', ''):
+                            continue
+                        new_head.append(link)
+                    for meta in metas:
+                        new_head.append(meta)
+                    head.replace_with(new_head)
+                # Remove readium-related attributes from the html tag
+                html_tag = soup.find('html')
+                if html_tag:
+                    attrs_to_remove = [attr for attr in html_tag.attrs if 'readium' in attr.lower()]
+                    for attr in attrs_to_remove:
+                        del html_tag[attr]
+                fetched_files[filename] = str(soup)
+
+        # 7. Repackage into new epub
+        print("Repackaging epub with fetched content...")
         out_epub = os.path.splitext(epub_path)[0] + "_fetched.epub"
         with zipfile.ZipFile(out_epub, 'w') as out_zf:
             # Write mimetype first, uncompressed
@@ -104,6 +147,7 @@ async def main(epub_path):
                         data = zf.read(item.filename)
                     out_zf.writestr(item, data)
         print(f"Repackaged epub written to {out_epub}")
+
     finally:
         pass
         proc.terminate()

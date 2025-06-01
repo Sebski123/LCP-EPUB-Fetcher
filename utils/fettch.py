@@ -63,7 +63,7 @@ async def get_content_via_evaluate(devtools_ws_url, resource_url):
 
                     if isinstance(eval_result, dict) and eval_result.get("success"):
                         content = eval_result["content"]
-                        print("Content fetched successfully via Runtime.evaluate!")
+                        # print("Content fetched successfully via Runtime.evaluate!")
                         # with open("downloaded_file_runtime.html", "w", encoding="utf-8") as f:
                         #     f.write(content)
                         # print("Saved content to downloaded_file_runtime.html")
@@ -143,7 +143,7 @@ async def get_image_via_evaluate(devtools_ws_url, image_url):
 
                     if isinstance(eval_result, dict) and eval_result.get("success"):
                         base64_data = eval_result["base64"]
-                        print("Image fetched successfully via Runtime.evaluate!")
+                        # print("Image fetched successfully via Runtime.evaluate!")
                         # To save as file:
                         # with open("downloaded_image.png", "wb") as f:
                         #     f.write(base64.b64decode(base64_data))
