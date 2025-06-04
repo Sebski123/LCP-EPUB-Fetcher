@@ -24,6 +24,20 @@ def enum_windows_callback(hwnd, pid):
             win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 
 
+async def fetch_file(base_dir, ws_url, file_type, file):
+    if file == "nav.xhtml":
+        return None, None
+    file_path = os.path.normpath(os.path.join(base_dir, file))
+    url = file_path
+    if file_type.startswith("application/xhtml+xml") or file_type.startswith("text/css"):
+        content = await get_content_via_evaluate(ws_url, url)
+        return file_path.split("\\")[-1], content
+    elif file_type.startswith("image/"):
+        content = await get_image_via_evaluate(ws_url, url)
+        return file_path.split("\\")[-1], content
+    return None, None
+
+
 async def main(epub_path: str):
     # 0. Check if the epub file exists and if there alraedy is a _fetched.epub file
     if not os.path.exists(epub_path):
@@ -114,21 +128,8 @@ async def main(epub_path: str):
 
         print(f"Fetching {total_files-1} files from epub...")  # Exclude nav.xhtml
 
-        async def fetch_file(idx, file_type, file):
-            if file == "nav.xhtml":
-                return None, None
-            file_path = os.path.normpath(os.path.join(base_dir, file))
-            url = file_path
-            if file_type.startswith("application/xhtml+xml") or file_type.startswith("text/css"):
-                content = await get_content_via_evaluate(ws_url, url)
-                return file_path.split("\\")[-1], content
-            elif file_type.startswith("image/"):
-                content = await get_image_via_evaluate(ws_url, url)
-                return file_path.split("\\")[-1], content
-            return None, None
-
         tasks = [
-            fetch_file(idx, file_type, file)
+            fetch_file(base_dir, ws_url, file_type, file)
             for idx, (file_type, file) in enumerate(file_list, 1)
         ]
         results = await asyncio.gather(*tasks)
