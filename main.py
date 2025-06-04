@@ -109,7 +109,6 @@ async def main(epub_path: str):
             opf_path = None
             # Find the path to package.opf from META-INF/container.xml
             with zf.open("META-INF/container.xml") as f:
-                import xml.etree.ElementTree as ET
                 tree = ET.parse(f)
                 rootfile = tree.find(".//{*}rootfile")
                 opf_path = rootfile.attrib['full-path']
