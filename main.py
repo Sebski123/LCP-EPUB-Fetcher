@@ -13,7 +13,24 @@ from utils.fettch import get_content_via_evaluate, get_image_via_evaluate
 from utils.get_path import get_base_path
 
 
-async def main(epub_path):
+async def main(epub_path: str):
+    # 0. Check if the epub file exists and if there alraedy is a _fetched.epub file
+    if not os.path.exists(epub_path):
+        print(f"Error: The file {epub_path} does not exist.")
+        return
+    if epub_path.endswith("_fetched.epub"):
+        print(f"Error: The file {epub_path} already seems to be fetched. Please provide a different epub file.")
+        return
+    if not epub_path.endswith(".epub"):
+        print(f"Error: The file {epub_path} is not a valid epub file.")
+        return
+    out_epub = os.path.splitext(epub_path)[0] + "_fetched.epub"
+    if os.path.exists(out_epub):
+        response = input(f"The file {out_epub} already exists. Do you want to replace it? (y/N): ").strip().lower()
+        if response != 'y':
+            print("Operation cancelled.")
+            return
+
     # 1. Launch Thorium Reader with debug args
     thorium_path = R"C:\Users\sebth\AppData\Local\Programs\Thorium\Thorium.exe"  # Adjust if needed
     proc = subprocess.Popen(
@@ -141,6 +158,9 @@ async def main(epub_path):
         # 7. Repackage into new epub
         print("Repackaging epub with fetched content...")
         out_epub = os.path.splitext(epub_path)[0] + "_fetched.epub"
+        if os.path.exists(out_epub):
+            os.remove(out_epub)  # Remove existing file if it exists
+
         with zipfile.ZipFile(out_epub, 'w') as out_zf:
             # Write mimetype first, uncompressed
             with zipfile.ZipFile(epub_path, 'r') as zf:
