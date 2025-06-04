@@ -74,25 +74,35 @@ async def main(epub_path):
             manifest = tree.find('.//opf:manifest', ns)
             file_list = [(item.attrib['media-type'], item.attrib['href']) for item in manifest.findall('opf:item', ns)]
 
-        # 5. Fetch each file using get_content_via_evaluate, with progress
-        recource_url = await get_base_path(ws_url)
-        base_dir = recource_url + os.path.dirname(opf_path)
+        # 5. Fetch each file using get_content_via_evaluate, with progress (parallelized)
+        resource_url = await get_base_path(ws_url)
+        base_dir = resource_url + os.path.dirname(opf_path)
         fetched_files = {}
         total_files = len(file_list)
-        for idx, (file_type, file) in enumerate(file_list, 1):
-            print(f"Fetching file {idx}/{total_files}: {file} ...", end="\r")
+
+        print(f"Fetching {total_files-1} files from epub...")  # Exclude nav.xhtml
+
+        async def fetch_file(idx, file_type, file):
             if file == "nav.xhtml":
-                continue
+                return None, None
+            file_path = os.path.normpath(os.path.join(base_dir, file))
+            url = file_path
             if file_type.startswith("application/xhtml+xml") or file_type.startswith("text/css"):
-                file_path = os.path.normpath(os.path.join(base_dir, file))
-                url = file_path
                 content = await get_content_via_evaluate(ws_url, url)
-                fetched_files[file_path.split("\\")[-1]] = content
+                return file_path.split("\\")[-1], content
             elif file_type.startswith("image/"):
-                file_path = os.path.normpath(os.path.join(base_dir, file))
-                url = file_path
                 content = await get_image_via_evaluate(ws_url, url)
-                fetched_files[file_path.split("\\")[-1]] = content
+                return file_path.split("\\")[-1], content
+            return None, None
+
+        tasks = [
+            fetch_file(idx, file_type, file)
+            for idx, (file_type, file) in enumerate(file_list, 1)
+        ]
+        results = await asyncio.gather(*tasks)
+        for filename, content in results:
+            if filename and content:
+                fetched_files[filename] = content
         print(f"\nFetched {len(fetched_files)} files.")
 
         # 6. Filter the fetched files
