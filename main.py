@@ -7,10 +7,21 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 import requests
+import win32con
+import win32gui
+import win32process
 from bs4 import BeautifulSoup
 
 from utils.fettch import get_content_via_evaluate, get_image_via_evaluate
 from utils.get_path import get_base_path
+
+
+def enum_windows_callback(hwnd, pid):
+    if win32gui.IsWindowVisible(hwnd):
+        _, found_pid = win32process.GetWindowThreadProcessId(hwnd)
+        if found_pid == pid:
+            # Hide the window
+            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 
 
 async def main(epub_path: str):
@@ -60,6 +71,10 @@ async def main(epub_path: str):
         else:
             print("Could not connect to Thorium remote debugger.")
             return
+
+        # Hide the Thorium window
+        print("Hiding Thorium window...")
+        win32gui.EnumWindows(lambda hwnd, _: enum_windows_callback(hwnd, proc.pid), None)
 
         # 3. Find webSocketDebuggerUrl
         targets = resp.json()
