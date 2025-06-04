@@ -1,11 +1,22 @@
 import asyncio
 import json
+from typing import Any
 
 import websockets
 
 
-async def find_matching_urls_in_frames(devtools_ws_url, url_substring_to_find):
-    found_urls = []
+async def find_matching_urls_in_frames(devtools_ws_url: str, url_substring_to_find: str):
+    """Finds URLs in the frame tree of a web page that match a given substring.
+
+    Args:
+        devtools_ws_url: _webSocketDebuggerUrl of the Thorium Reader_
+        url_substring_to_find: _substring to search for in the URLs_
+
+    Returns:
+        A list of URLs that contain the specified substring.
+        If no URLs are found, an empty list is returned.
+    """
+    found_urls: list[str] = []
     async with websockets.connect(devtools_ws_url) as websocket:
         # Enable Page domain
         await websocket.send(json.dumps({
@@ -29,12 +40,12 @@ async def find_matching_urls_in_frames(devtools_ws_url, url_substring_to_find):
 
             if data.get("id") == message_id_get_frame_tree:
                 if "result" in data and "frameTree" in data["result"]:
-                    frame_tree_root = data["result"]["frameTree"]
+                    frame_tree_root: dict[str, dict[str, str]] = data["result"]["frameTree"]
 
-                    def extract_urls_recursive(frame_node):
+                    def extract_urls_recursive(frame_node: dict[str, Any]):
                         frame = frame_node.get("frame")
                         if frame:
-                            url = frame.get("url")
+                            url: str = frame.get("url")
                             # print(f"Checking frame URL: {url}") # Debug print
                             if url and url_substring_to_find in url:
                                 found_urls.append(url)
@@ -53,7 +64,15 @@ async def find_matching_urls_in_frames(devtools_ws_url, url_substring_to_find):
     return found_urls
 
 
-async def get_base_path(devtools_ws_url):
+async def get_base_path(devtools_ws_url: str):
+    """Gets the base path from the Thorium Reader's frame tree by searching for a specific URL substring.
+
+    Args:
+        devtools_ws_url: _webSocketDebuggerUrl of the Thorium Reader_
+
+    Returns:
+        The base path of the Thorium Reader's frame tree if a matching URL is found, otherwise None.
+    """
     SUBSTRING_TO_FIND = "httpsr2://"
     urls = await find_matching_urls_in_frames(devtools_ws_url, SUBSTRING_TO_FIND)
     if urls:

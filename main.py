@@ -16,7 +16,14 @@ from utils.fettch import get_content_via_evaluate, get_image_via_evaluate
 from utils.get_path import get_base_path
 
 
-def enum_windows_callback(hwnd, pid):
+def enum_windows_callback(hwnd: int, pid: int):
+    """Callback function for EnumWindows to find the Thorium Reader window by process ID.
+    If the window is visible, it hides it.
+
+    Args:
+        hwnd: _handle to the window
+        pid: Process ID of the Thorium Reader process
+    """
     if win32gui.IsWindowVisible(hwnd):
         _, found_pid = win32process.GetWindowThreadProcessId(hwnd)
         if found_pid == pid:
@@ -24,7 +31,19 @@ def enum_windows_callback(hwnd, pid):
             win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
 
 
-async def fetch_file(base_dir, ws_url, file_type, file):
+async def fetch_file(base_dir: str, ws_url: str, file_type: str, file: str):
+    """Fetch a file from the epub using the Thorium Reader's remote debugging interface.
+
+    Args:
+        base_dir: _base directory of the epub files_
+        ws_url: _webSocketDebuggerUrl of the Thorium Reader_
+        file_type: _mime type of the file_
+        file: _name of the file to fetch_
+
+    Returns:
+        A tuple containing the filename and the content of the file, or None if the file is not needed.
+        If the file is nav.xhtml, it returns None, None.
+    """
     if file == "nav.xhtml":
         return None, None
     file_path = os.path.normpath(os.path.join(base_dir, file))
@@ -39,6 +58,12 @@ async def fetch_file(base_dir, ws_url, file_type, file):
 
 
 async def main(epub_path: str):
+    """Main function to fetch content from an epub file using Thorium Reader's remote debugging interface.
+
+    Args:
+        epub_path: _path to the epub file to fetch content from_
+    """
+
     # 0. Check if the epub file exists and if there alraedy is a _fetched.epub file
     if not os.path.exists(epub_path):
         print(f"Error: The file {epub_path} does not exist.")
@@ -73,14 +98,14 @@ async def main(epub_path: str):
         # 2. Wait for debugger to be ready
         for _ in range(30):
             try:
-                resp = requests.get("http://localhost:9223/json")
+                resp = requests.get("http://localhost:9223/json", timeout=5)
                 if resp.ok:
                     if len(resp.json()) == 3:
                         break
                     else:
                         print("Waiting for Thorium remote debugger to be ready...")
                         time.sleep(1)
-            except Exception:
+            except (requests.ConnectionError, requests.Timeout):
                 time.sleep(1)
         else:
             print("Could not connect to Thorium remote debugger.")
@@ -111,25 +136,28 @@ async def main(epub_path: str):
             with zf.open("META-INF/container.xml") as f:
                 tree = ET.parse(f)
                 rootfile = tree.find(".//{*}rootfile")
+                assert rootfile is not None, "No rootfile found in container.xml"
                 opf_path = rootfile.attrib['full-path']
             with zf.open(opf_path) as f:
                 opf_xml = f.read()
             tree = ET.fromstring(opf_xml)
             ns = {'opf': 'http://www.idpf.org/2007/opf'}
             manifest = tree.find('.//opf:manifest', ns)
+            assert manifest is not None, "No manifest found in package.opf"
             file_list = [(item.attrib['media-type'], item.attrib['href']) for item in manifest.findall('opf:item', ns)]
 
         # 5. Fetch each file using get_content_via_evaluate, with progress (parallelized)
         resource_url = await get_base_path(ws_url)
+        assert resource_url is not None, "Could not get base path from Thorium Reader"
         base_dir = resource_url + os.path.dirname(opf_path)
-        fetched_files = {}
+        fetched_files: dict[str, str | bytes] = {}
         total_files = len(file_list)
 
         print(f"Fetching {total_files-1} files from epub...")  # Exclude nav.xhtml
 
         tasks = [
             fetch_file(base_dir, ws_url, file_type, file)
-            for idx, (file_type, file) in enumerate(file_list, 1)
+            for _, (file_type, file) in enumerate(file_list, 1)
         ]
         results = await asyncio.gather(*tasks)
         for filename, content in results:
@@ -151,7 +179,7 @@ async def main(epub_path: str):
                     title = head.find('title')
                     links = head.find_all('link', rel='stylesheet')
                     metas = head.find_all('meta')
-                    new_head = soup.new_tag('head')
+                    new_head = soup.new_tag('head')  # type: ignore
                     if title:
                         new_head.append(title)
                     for link in links:
@@ -165,9 +193,10 @@ async def main(epub_path: str):
                 # Remove readium-related attributes from the html tag
                 html_tag = soup.find('html')
                 if html_tag:
-                    attrs_to_remove = [attr for attr in html_tag.attrs if 'readium' in attr.lower()]
+                    attrs_to_remove: list[str] = [
+                        attr for attr in html_tag.attrs if 'readium' in attr.lower()]  # type: ignore
                     for attr in attrs_to_remove:
-                        del html_tag[attr]
+                        del html_tag[attr]  # type: ignore
                 fetched_files[filename] = str(soup)
 
         # 7. Repackage into new epub
@@ -194,7 +223,6 @@ async def main(epub_path: str):
         print(f"Repackaged epub written to {out_epub}")
 
     finally:
-        pass
         proc.terminate()
 
 

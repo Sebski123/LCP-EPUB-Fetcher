@@ -1,19 +1,28 @@
 import asyncio
 import base64
 import json
-import re
 
 import websockets
 
 
-async def get_content_via_evaluate(devtools_ws_url, resource_url):
+async def get_content_via_evaluate(devtools_ws_url: str, resource_url: str):
+    """Fetch content from a resource URL using the Chrome DevTools Protocol's Runtime.evaluate method.
+
+    Args:
+        devtools_ws_url: _webSocketDebuggerUrl of the Chrome DevTools Protocol_
+        resource_url: _URL of the resource to fetch content from, typically a file in the epub_
+
+    Returns:
+        The content of the resource as a string, or None if an error occurs.
+        If the resource is not needed (like nav.xhtml), it returns None.
+    """
     async with websockets.connect(devtools_ws_url) as websocket:
         # Enable Runtime domain
         await websocket.send(json.dumps({
             "id": 1,  # Unique message ID
             "method": "Runtime.enable"
         }))
-        response = await websocket.recv()  # Wait for acknowledgment
+        _ = await websocket.recv()  # Wait for acknowledgment
         # print(f"Runtime.enable response: {response}")
 
         # Optional: Get Page Tree to confirm frame context if needed,
@@ -61,14 +70,15 @@ async def get_content_via_evaluate(devtools_ws_url, resource_url):
                 if "result" in data and "result" in data["result"]:
                     eval_result = data["result"]["result"]["value"]  # The actual value returned by the JS
 
-                    if isinstance(eval_result, dict) and eval_result.get("success"):
-                        content = eval_result["content"]
+                    if isinstance(eval_result, dict) and eval_result.get("success"):  # type: ignore
+                        assert isinstance(eval_result["content"], str), "Expected content to be a string"
+                        content: str = eval_result["content"]
                         # print("Content fetched successfully via Runtime.evaluate!")
                         # with open("downloaded_file_runtime.html", "w", encoding="utf-8") as f:
                         #     f.write(content)
                         # print("Saved content to downloaded_file_runtime.html")
                         return content
-                    elif isinstance(eval_result, dict) and eval_result.get("error"):
+                    elif isinstance(eval_result, dict) and eval_result.get("error"):  # type: ignore
                         print(f"Error during fetch in page context: {eval_result['error']}")
                         return None
                     else:
@@ -90,7 +100,17 @@ async def get_content_via_evaluate(devtools_ws_url, resource_url):
             #    print(f"Received other message: {data.get('method', data)}")
 
 
-async def get_image_via_evaluate(devtools_ws_url, image_url):
+async def get_image_via_evaluate(devtools_ws_url: str, image_url: str):
+    """Fetch an image from a URL using the Chrome DevTools Protocol's Runtime.evaluate method.
+
+    Args:
+        devtools_ws_url: _webSocketDebuggerUrl of the Chrome DevTools Protocol_
+        image_url: _URL of the image to fetch, typically a file in the epub_
+
+    Returns:
+        The image content as bytes, or None if an error occurs.
+        If the image is not needed, it returns None.
+    """
     async with websockets.connect(devtools_ws_url) as websocket:
         await websocket.send(json.dumps({
             "id": 1,
@@ -141,14 +161,15 @@ async def get_image_via_evaluate(devtools_ws_url, image_url):
                 if "result" in data and "result" in data["result"]:
                     eval_result = data["result"]["result"]["value"]
 
-                    if isinstance(eval_result, dict) and eval_result.get("success"):
+                    if isinstance(eval_result, dict) and eval_result.get("success"):  # type: ignore
+                        assert isinstance(eval_result["base64"], str), "Expected base64 to be a string"
                         base64_data = eval_result["base64"]
                         # print("Image fetched successfully via Runtime.evaluate!")
                         # To save as file:
                         # with open("downloaded_image.png", "wb") as f:
                         #     f.write(base64.b64decode(base64_data))
                         return base64.b64decode(base64_data)
-                    elif isinstance(eval_result, dict) and eval_result.get("error"):
+                    elif isinstance(eval_result, dict) and eval_result.get("error"):  # type: ignore
                         print(f"Error during image fetch in page context: {eval_result['error']}")
                         return None
                     else:
