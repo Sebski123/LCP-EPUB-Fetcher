@@ -39,8 +39,18 @@ async def main(epub_path: str):
             print("Operation cancelled.")
             return
 
-    # 1. Launch Thorium Reader with debug args
+    # 0.5 Check if Thorium Reader is already running, if so, ask to close it
     thorium_path = find_thorium_path()
+    for proc in subprocess.run(['tasklist'], capture_output=True, text=True).stdout.splitlines():
+        if os.path.basename(thorium_path).lower() in proc.lower():
+            response = input(
+                "Thorium Reader is already running. Please close it and then press enter to continue. To cancel type 'exit' and press enter").strip().lower()
+            if response == 'exit':
+                print("Operation cancelled.")
+                return
+            break
+
+    # 1. Launch Thorium Reader with debug args
     proc = subprocess.Popen(
         [
             thorium_path,
