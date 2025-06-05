@@ -1,6 +1,6 @@
-import asyncio
 import base64
 import json
+import os
 
 import websockets
 
@@ -187,29 +187,28 @@ async def get_image_via_evaluate(devtools_ws_url: str, image_url: str):
                     return None
                 break
 
-if __name__ == "__main__":
-    # Replace with your actual DevTools WebSocket URL and resource URL
-    # 1. Find your page's websocket URL from http://localhost:9222/json
-    # It will look like "ws://localhost:9222/devtools/page/XXXXXXXXX"
-    DEVTOOLS_WS_URL = "ws://localhost:9223/devtools/page/5A4CF9F84792B821B2FD8B00EE8AC4EA"  # Replace!
-    RESOURCE_URL = "httpsr2://id_l2hvb_w_uvc2_vid_ggv_lm_nvbm_zp_zy9_f_r_f_j_m_y_w_iu_v_ghvcml1b_v_jl_y_w_rlci9wd_w_jsa_w_nhd_glvbn_mv_mjkw_m2_e1_yz_mt_nm_iw_yi00_nm_u0_l_tk2_m_dgt_n_dg5_mj_zm_mm_fj_m_g_fj_l2_jvb2su_z_x_b1_yg--/xthoriumhttps/ip0.0.0.0/p/EPUB/dk-nota-666120-012-part.xhtml"
 
-    # Before running, ensure your Electron app is running with --remote-debugging-port=9222
-    # And update DEVTOOLS_WS_URL by visiting http://localhost:9222/json in your browser
-    # to get the list of targets and pick the correct webSocketDebuggerUrl.
-    # For example, if http://localhost:9222/json shows:
-    # {
-    # ...
-    # "id": "ABC123DEF456",
-    # "type": "page",
-    # "url": "...",
-    # "webSocketDebuggerUrl": "ws://localhost:9222/devtools/page/ABC123DEF456"
-    # ...
-    # }
-    # Then DEVTOOLS_WS_URL = "ws://localhost:9222/devtools/page/ABC123DEF456"
+async def fetch_file(base_dir: str, ws_url: str, file_type: str, file: str):
+    """Fetch a file from the epub using the Thorium Reader's remote debugging interface.
 
-    # To run this:
-    asyncio.run(get_content_via_evaluate(DEVTOOLS_WS_URL, RESOURCE_URL))
-    # print("CDP script is conceptual. Please ensure you have the correct DEVTOOLS_WS_URL.")
-    # print("You can get it from http://localhost:9222/json (look for webSocketDebuggerUrl).")
-    # print("And replace 'YOUR_PAGE_ID_HERE' in the script.")
+    Args:
+        base_dir: _base directory of the epub files_
+        ws_url: _webSocketDebuggerUrl of the Thorium Reader_
+        file_type: _mime type of the file_
+        file: _name of the file to fetch_
+
+    Returns:
+        A tuple containing the filename and the content of the file, or None if the file is not needed.
+        If the file is nav.xhtml, it returns None, None.
+    """
+    if file == "nav.xhtml":
+        return None, None
+    file_path = os.path.normpath(os.path.join(base_dir, file))
+    url = file_path
+    if file_type.startswith("application/xhtml+xml") or file_type.startswith("text/css"):
+        content = await get_content_via_evaluate(ws_url, url)
+        return file_path.split("\\")[-1], content
+    elif file_type.startswith("image/"):
+        content = await get_image_via_evaluate(ws_url, url)
+        return file_path.split("\\")[-1], content
+    return None, None

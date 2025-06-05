@@ -7,54 +7,12 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 import requests
-import win32con
 import win32gui
-import win32process
 from bs4 import BeautifulSoup
 
-from utils.fettch import get_content_via_evaluate, get_image_via_evaluate
+from utils import hide_visible_window_by_pid
+from utils.fetch import fetch_file
 from utils.get_path import get_base_path
-
-
-def enum_windows_callback(hwnd: int, pid: int):
-    """Callback function for EnumWindows to find the Thorium Reader window by process ID.
-    If the window is visible, it hides it.
-
-    Args:
-        hwnd: _handle to the window
-        pid: Process ID of the Thorium Reader process
-    """
-    if win32gui.IsWindowVisible(hwnd):
-        _, found_pid = win32process.GetWindowThreadProcessId(hwnd)
-        if found_pid == pid:
-            # Hide the window
-            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-
-
-async def fetch_file(base_dir: str, ws_url: str, file_type: str, file: str):
-    """Fetch a file from the epub using the Thorium Reader's remote debugging interface.
-
-    Args:
-        base_dir: _base directory of the epub files_
-        ws_url: _webSocketDebuggerUrl of the Thorium Reader_
-        file_type: _mime type of the file_
-        file: _name of the file to fetch_
-
-    Returns:
-        A tuple containing the filename and the content of the file, or None if the file is not needed.
-        If the file is nav.xhtml, it returns None, None.
-    """
-    if file == "nav.xhtml":
-        return None, None
-    file_path = os.path.normpath(os.path.join(base_dir, file))
-    url = file_path
-    if file_type.startswith("application/xhtml+xml") or file_type.startswith("text/css"):
-        content = await get_content_via_evaluate(ws_url, url)
-        return file_path.split("\\")[-1], content
-    elif file_type.startswith("image/"):
-        content = await get_image_via_evaluate(ws_url, url)
-        return file_path.split("\\")[-1], content
-    return None, None
 
 
 async def main(epub_path: str):
@@ -113,7 +71,7 @@ async def main(epub_path: str):
 
         # Hide the Thorium window
         print("Hiding Thorium window...")
-        win32gui.EnumWindows(lambda hwnd, _: enum_windows_callback(hwnd, proc.pid), None)
+        win32gui.EnumWindows(lambda hwnd, _: hide_visible_window_by_pid(hwnd, proc.pid), None)
 
         # 3. Find webSocketDebuggerUrl
         targets = resp.json()
