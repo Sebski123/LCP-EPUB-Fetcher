@@ -2,17 +2,18 @@ import asyncio
 import os
 import subprocess
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 import zipfile
 
 import requests
-import win32gui
 from bs4 import BeautifulSoup
 
-from utils import find_thorium_path, hide_visible_window_by_pid
+from utils import find_thorium_path
 from utils.fetch import fetch_file
 from utils.get_path import get_base_path
+from utils.hide_windows import monitor_and_hide_program_by_pid
 
 
 async def main(epub_path: str):
@@ -62,6 +63,12 @@ async def main(epub_path: str):
         stderr=subprocess.DEVNULL,
     )
 
+    # Start the monitor thread
+    # This thread will hide any Thorium Reader window if it becomes visible
+    stop_event = threading.Event()
+    monitor_thread = threading.Thread(target=monitor_and_hide_program_by_pid, args=(proc.pid, stop_event))
+    monitor_thread.start()
+
     try:
         # 2. Wait for debugger to be ready
         for _ in range(30):
@@ -79,9 +86,11 @@ async def main(epub_path: str):
             print("Could not connect to Thorium remote debugger.")
             return
 
-        # Hide the Thorium window
-        print("Hiding Thorium window...")
-        win32gui.EnumWindows(lambda hwnd, _: hide_visible_window_by_pid(hwnd, proc.pid), None)
+        print("Thorium Reader is ready for remote debugging.")
+
+        # Stop the monitor thread
+        stop_event.set()
+        monitor_thread.join()
 
         # 3. Find webSocketDebuggerUrl
         targets = resp.json()
