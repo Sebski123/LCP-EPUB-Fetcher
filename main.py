@@ -10,7 +10,7 @@ import requests
 import win32gui
 from bs4 import BeautifulSoup
 
-from utils import hide_visible_window_by_pid
+from utils import find_thorium_path, hide_visible_window_by_pid
 from utils.fetch import fetch_file
 from utils.get_path import get_base_path
 
@@ -40,7 +40,7 @@ async def main(epub_path: str):
             return
 
     # 1. Launch Thorium Reader with debug args
-    thorium_path = R"C:\Users\sebth\AppData\Local\Programs\Thorium\Thorium.exe"  # Adjust if needed
+    thorium_path = find_thorium_path()
     proc = subprocess.Popen(
         [
             thorium_path,
