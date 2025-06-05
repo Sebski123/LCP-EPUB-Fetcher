@@ -140,7 +140,7 @@ async def main(epub_path: str):
         for filename, content in results:
             if filename and content:
                 fetched_files[filename] = content
-        print(f"\nFetched {len(fetched_files)} files.")
+        print(f"Fetched {len(fetched_files)} files.")
 
         # 6. Filter the fetched files
         # the fetched xhtml files contains a bunch of javascript/css that is not needed
