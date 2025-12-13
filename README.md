@@ -1,6 +1,6 @@
 # LCP EPUB Fetcher
 
-This project is a tool for extracting and repackaging the contents of LCP-protected EPUB files using Thorium Reader's remote debugging interface.
+This project is a tool for extracting and repackaging the contents of LCP-protected EPUB and PDF files using Thorium Reader's remote debugging interface.
 
 ## Features
 - Launches Thorium Reader with remote debugging enabled
@@ -24,13 +24,19 @@ This project is a tool for extracting and repackaging the contents of LCP-protec
 You can use either of the following methods to fetch and repackage an LCP-protected EPUB:
 
 ### 1. Command Line
-Run the script with the path to your LCP-protected EPUB file:
+Run the script with the path to your LCP-protected EPUB or PDF file:
 ```powershell
-python main.py <epub_path>
+python main.py <file_path>
+```
+### 1.1 Command Line alternative for PDF
+If the commandline argument ```--browser-download``` is added, the chrome download dialog is used to download the file (or it's saved directly to downloads, depends on your Chrome settings).  
+This is a lot faster than the default method, but the script has no way to check progress or success/failure
+```powershell
+python main.py <file_path> --browser-download
 ```
 
 ### 2. Drag and Drop
-Alternatively, you can use the provided batch script (`run_epub_fetcher.bat`) by dragging and dropping your EPUB file onto it. This will automatically run the script with the selected file.
+Alternatively, you can use the provided batch script (`run_epub_fetcher.bat`) by dragging and dropping your EPUB or PDF file onto it. This will automatically run the script with the selected file.
 
 A new file with `_fetched.epub` appended to the name will be created, containing the decrypted resources.
 
